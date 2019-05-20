@@ -1,45 +1,165 @@
 let Balls= [];
+let numberOfBalls = 12;
+let fBall = [];
+let pointBarHeight = 20;
+
+let MaxPlayTime = 3;
+let ActualPlayTime  = 3;
+function preload(){
+    for(let i = 0; i < 10; i++){
+        fBall[i] = loadImage("./images/balls/ball"+i+".png");
+    }
+
+}
+
 
 function setup() {
-    createCanvas(600, 400);
-    for (let i = 0; i < 5; i++) {
-        Balls[i] = new Ball(random(width), random(height), random(20,80));
+
+    createCanvas(900, 600);
+    frameRate(60);
+    //We create the balls
+    for (let i = 0; i < numberOfBalls; i++) {
+        //Create the ball in random position keeping in bounds with random size
+
+        //We need to check if the ball collides with other, if its the case we need to recreate
+        var Created = false;
+        //Do while the ball is not created
+        while(!Created){
+            var bol = new Ball(random(width), random(height), random(20,50),fBall);
+            var vCreate = true;
+            //Check with all the other balls if the new ball collides with any other
+            for (let other of Balls) {
+                if (bol !== other ) {
+                    if(bol.checkCollisionCreate(other)){
+                        vCreate = false;
+                    }
+                }
+            }
+            //If the ball is created, exit he loop
+            if(vCreate){
+                Created = true;
+            }else{ //If not, recreate the ball with random position
+                console.log("Recreate");
+            }
+        }
+
+        Balls[i] = bol;
     }
 }
 
 function draw() {
     background(51);
-    for (let b of Balls) {
-        b.update();
-        b.display();
-        b.checkBoundaryCollision();
-        for (let other of Balls) {
-            if (b !== other ) {
-                b.checkCollision(other);
-                console.log("xocat");
-            }
-        }
+    let invisibleBalls = 0;
 
+    //console.log(time2)
+
+    for (let b of Balls) {
+        if(b.visible){
+            b.update();
+            b.display();
+            b.checkBoundaryCollision();
+            for (let other of Balls) {
+                if (b !== other && other.visible) {
+                    b.checkCollision(other);
+
+                }
+            }
+
+        }else{
+            invisibleBalls += 1;
+            b.checkTime()
+        }
     }
+
+    fill(0);
+    rect(0,0,width,pointBarHeight);
+    fill(color(255,0,0));
+    rect(0,0,map(ActualPlayTime,0,MaxPlayTime,0,width), pointBarHeight);
+
+    ActualPlayTime -= 0.01;
 
     //Balls[0].checkCollision(Balls[1]);
 }
-
+function mouseReleased() {
+    for (let b of Balls) {
+        b.mouseClickCheck();
+    }
+}
 
 class Ball {
 
 
-    constructor(x, y, r_) {
+    constructor(x, y, r_, img) {
+        this.visible = true;
         this.position = new p5.Vector(x, y);
         this.velocity = p5.Vector.random2D();
         this.velocity.mult(3);
         this.radius = r_;
         this.m = this.radius*.1;
+        this.actual = img;
+        this.actualframe = 0;
+        this.frames = this.actual.length;
+        this.time1 = 0;
+
+    }
+
+    checkTime(){
+        let time2 = millis() - this.time1;
+        //console.log(time2);
+        if(time2 >= 2000){
+            let vCreate = false;
+            while(!vCreate){
+                vCreate = true;
+                for (let other of Balls) {
+                    if (this !== other) {
+                        if (this.checkCollisionCreate(other)) {
+                            this.position = new p5.Vector(random(width), random(height));
+                            this.radius = random(20,30);
+                            this.m = this.radius*.1;
+                            this.time1 = 0;
+                            this.visible = true;
+                            vCreate = false;
+
+                        }
+                    }
+                }
+
+            }
+            this.visible = true;
+
+
+        }
+
+
     }
 
 
     update() {
-        this.position.add(this.velocity);
+        if(this.visible){
+            this.position.add(this.velocity);
+        }
+
+    }
+
+    mouseClickCheck() {
+
+        if(this.visible){
+            var posMouse = new p5.Vector(mouseX, mouseY);
+            // Get distances between the balls components
+            if(Math.sqrt((posMouse.x-this.position.x)*(posMouse.x-this.position.x) + (posMouse.y-this.position.y)*(posMouse.y-this.position.y)) < this.radius + 10){
+                this.incrementTime();
+                this.time1 = millis();
+                this.visible = false;
+
+
+            }else{
+                this.decrementTime();
+            }
+        }else{
+            this.decrementTime();
+        }
+
+
     }
 
     checkBoundaryCollision() {
@@ -49,14 +169,48 @@ class Ball {
         } else if (this.position.x < this.radius) {
             this.position.x = this.radius;
             this.velocity.x *= -1;
-        } else if (this.position.y > height-this.radius) {
+        } else if (this.position.y   > height-this.radius) {
             this.position.y = height-this.radius;
             this.velocity.y *= -1;
-        } else if (this.position.y < this.radius) {
-            this.position.y = this.radius;
+        } else if (this.position.y < this.radius + pointBarHeight) {
+            this.position.y = this.radius + pointBarHeight;
             this.velocity.y *= -1;
         }
     }
+
+    incrementTime(){
+        if(ActualPlayTime + 1 >= MaxPlayTime ){
+            ActualPlayTime = MaxPlayTime
+        }else{
+            ActualPlayTime += 1;
+        }
+    }
+    decrementTime(){
+        if(ActualPlayTime -0.05 <= 0 ){
+            ActualPlayTime = 0
+        }else{
+            ActualPlayTime -= 0.05;
+        }
+    }
+    checkCollisionCreate(other){
+        // Get distances between the balls components
+        var distanceVect = p5.Vector.sub(other.position, this.position);
+
+        // Calculate magnitude of the vector separating the balls
+        var distanceVectMag = distanceVect.mag();
+
+        // Minimum distance before they are touching
+        var minDistance = this.radius + other.radius;
+
+        console.log(minDistance);
+        if (distanceVectMag < minDistance + 50) {
+            //The ball has to be recrearted
+            return true;
+        }
+        return false;
+
+    }
+
 
     checkCollision(other) {
 
@@ -69,7 +223,7 @@ class Ball {
         // Minimum distance before they are touching
         var minDistance = this.radius + other.radius;
 
-        if (distanceVectMag < minDistance) {
+        if (distanceVectMag < minDistance && this.visible) {
             var distanceCorrection = (minDistance-distanceVectMag)/2.0;
             var d = distanceVect.copy();
             var correctionVector = d.normalize().mult(distanceCorrection);
@@ -151,12 +305,20 @@ class Ball {
             this.velocity.y = cosine * vFinal[0].y + sine * vFinal[0].x;
             other.velocity.x = cosine * vFinal[1].x - sine * vFinal[1].y;
             other.velocity.y = cosine * vFinal[1].y + sine * vFinal[1].x;
+            console.log("xocat");
         }
     }
 
     display() {
-        noStroke();
-        fill(204);
-        ellipse(this.position.x, this.position.y, this.radius*2, this.radius*2);
+        imageMode(CENTER);
+        if(this.visible){
+            image(this.actual[this.actualframe], this.position.x, this.position.y,this.radius*2, this.radius*2);
+            this.actualframe = (this.actualframe+1)%this.frames;
+        }
+
+        //image(fBall, this.position.x, this.position.y,this.radius*2, this.radius*2);
+        //noStroke();
+        //fill(this.color);
+        //ellipse(this.position.x, this.position.y, this.radius*2, this.radius*2);
     }
 }
